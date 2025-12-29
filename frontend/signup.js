@@ -1,5 +1,6 @@
-// Signup form handler
-document.getElementById('signupForm').addEventListener('submit', function (e) {
+import Utils from './utils.js';
+
+document.getElementById('signupForm').addEventListener('submit', async function (e) {
     e.preventDefault();
 
     const username = document.getElementById('username').value;
@@ -8,71 +9,51 @@ document.getElementById('signupForm').addEventListener('submit', function (e) {
     const confirmPassword = document.getElementById('confirmPassword').value;
     const terms = document.getElementById('terms').checked;
 
-    // Validate inputs
     if (!username || !email || !password || !confirmPassword) {
-        alert('Please fill in all fields');
+        Utils.showAlert('Please fill in all fields', 'warning');
         return;
     }
 
-    // Check if passwords match
     if (password !== confirmPassword) {
-        alert('Passwords do not match!');
+        Utils.showAlert('Passwords do not match!', 'error');
         document.getElementById('confirmPassword').focus();
         return;
     }
 
-    // Check password length
     if (password.length < 6) {
-        alert('Password must be at least 6 characters long');
+        Utils.showAlert('Password must be at least 6 characters long', 'warning');
         return;
     }
 
-    // Check terms accepted
     if (!terms) {
-        alert('Please accept the Terms and Conditions');
+        Utils.showAlert('Please accept the Terms and Conditions', 'warning');
         return;
     }
 
-    // Show loading state
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = 'Creating account...';
-    submitBtn.disabled = true;
+    const loader = Utils.setLoading(e.target.querySelector('button[type="submit"]'), 'Creating account...');
 
-    // Send signup request to backend
-    fetch('/api/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            username: username,  // Using username for the backend
-            password: password
-        })
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Account created successfully! User ID: ' + data.user_id + '\n\nRedirecting to login...');
-                // Store user info
-                localStorage.setItem('userId', data.user_id);
-                localStorage.setItem('username', username);
-                // Redirect to login page
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 1500);
-            } else {
-                alert('Signup failed: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error connecting to server: ' + error.message);
-        })
-        .finally(() => {
-            submitBtn.textContent = originalText;
-            submitBtn.disabled = false;
+    try {
+        const data = await Utils.apiFetch('/api/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password })
         });
+
+        if (data.success) {
+            Utils.showAlert('Account created successfully!\nRedirecting to login...', 'success');
+            localStorage.setItem('userId', data.user_id);
+            localStorage.setItem('username', username);
+
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1500);
+        } else {
+            Utils.showAlert('Signup failed: ' + data.message, 'error');
+        }
+    } catch (error) {
+        Utils.showAlert('Connection error: ' + error.message, 'error');
+    } finally {
+        loader.restore();
+    }
 });
 
 // Real-time password match validation
@@ -81,14 +62,13 @@ document.getElementById('confirmPassword').addEventListener('input', function ()
     const confirmPassword = this.value;
 
     if (confirmPassword && password !== confirmPassword) {
-        this.style.borderColor = '#e74c3c';
+        this.style.borderColor = 'var(--error)';
     } else {
         this.style.borderColor = '';
     }
 });
 
-// Add enter key support
-document.getElementById('confirmPassword').addEventListener('keypress', function (e) {
+document.getElementById('confirmPassword').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         document.getElementById('signupForm').dispatchEvent(new Event('submit'));
     }
